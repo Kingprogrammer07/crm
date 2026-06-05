@@ -79,18 +79,15 @@ async def create_lead_with_contact(
             ]
         }]
 
-        logging.info(f"[CONTACT] REQUEST payload: {contact_data}")
         async with session.post(contact_url, headers=headers, json=contact_data) as resp:
-            contact_body = await resp.text()
-            logging.info(f"[CONTACT] STATUS: {resp.status}")
-            logging.info(f"[CONTACT] RESPONSE body: {contact_body}")
             if resp.status not in (200, 201):
+                contact_body = await resp.text()
                 logging.error(f"Contact yaratishda xato {resp.status}: {contact_body}")
                 raise Exception(f"Contact yaratishda xato: {resp.status}")
 
             result = await resp.json()
             contact_id = result["_embedded"]["contacts"][0]["id"]
-            logging.info(f"[CONTACT] extracted contact_id: {contact_id}")
+            logging.info(f"[CONTACT] STATUS: {resp.status} id={contact_id}")
 
         # 2. Lead yaratish
         lead_url = f"{base_url}/leads"
@@ -100,18 +97,15 @@ async def create_lead_with_contact(
         if pipeline_id:
             lead_data[0]["pipeline_id"] = pipeline_id
 
-        logging.info(f"[LEAD] REQUEST payload: {lead_data}")
         async with session.post(lead_url, headers=headers, json=lead_data) as resp:
-            lead_body = await resp.text()
-            logging.info(f"[LEAD] STATUS: {resp.status}")
-            logging.info(f"[LEAD] RESPONSE body: {lead_body}")
             if resp.status not in (200, 201):
+                lead_body = await resp.text()
                 logging.error(f"Lead yaratishda xato {resp.status}: {lead_body}")
                 raise Exception(f"Lead yaratishda xato: {resp.status}")
 
             result = await resp.json()
             lead_id = result["_embedded"]["leads"][0]["id"]
-            logging.info(f"[LEAD] extracted lead_id: {lead_id}")
+            logging.info(f"[LEAD] STATUS: {resp.status} id={lead_id}")
 
         # 3. Contact ni lead ga bog'lash (link endpoint)
         link_url = f"{base_url}/leads/{lead_id}/link"
@@ -120,17 +114,13 @@ async def create_lead_with_contact(
             "to_entity_type": "contacts"
         }]
 
-        logging.info(f"[LINK] URL: {link_url}")
-        logging.info(f"[LINK] REQUEST payload: {link_data}")
         async with session.post(link_url, headers=headers, json=link_data) as resp:
-            link_body = await resp.text()
-            logging.info(f"[LINK] STATUS: {resp.status}")
-            logging.info(f"[LINK] RESPONSE body: {link_body}")
             if resp.status not in (200, 201):
+                link_body = await resp.text()
                 logging.error(f"Contact-lead bog'lashda xato {resp.status}: {link_body}")
                 raise Exception(f"Contact-lead bog'lashda xato: {resp.status}")
 
-            logging.info(f"[LINK] OK: lead_id={lead_id}, contact_id={contact_id}")
+            logging.info(f"[LINK] STATUS: {resp.status} lead_id={lead_id} contact_id={contact_id}")
 
         return lead_id
 
