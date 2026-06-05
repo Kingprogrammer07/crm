@@ -93,9 +93,6 @@ async def create_lead_with_contact(
         lead_url = f"{base_url}/leads"
         lead_data = [{
             "name": f"Telegram: {name}",
-            "_embedded": {
-                "contacts": [{"id": contact_id}]
-            }
         }]
         if pipeline_id:
             lead_data[0]["pipeline_id"] = pipeline_id
@@ -109,7 +106,23 @@ async def create_lead_with_contact(
             result = await resp.json()
             lead_id = result["_embedded"]["leads"][0]["id"]
             logging.info(f"amoCRM lead yaratildi: id={lead_id}")
-            return lead_id
+
+        # 3. Contact ni lead ga bog'lash (link endpoint)
+        link_url = f"{base_url}/leads/{lead_id}/link"
+        link_data = [{
+            "to_entity_id": contact_id,
+            "to_entity_type": "contacts"
+        }]
+
+        async with session.post(link_url, headers=headers, json=link_data) as resp:
+            if resp.status not in (200, 201):
+                text = await resp.text()
+                logging.error(f"Contact-lead bog'lashda xato {resp.status}: {text}")
+                raise Exception(f"Contact-lead bog'lashda xato: {resp.status}")
+
+            logging.info(f"amoCRM contact lead ga bog'landi: lead_id={lead_id}, contact_id={contact_id}")
+
+        return lead_id
 
 
 # ===== AMOCRM NOTE FUNKSiyasi =====
