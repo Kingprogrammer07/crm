@@ -4,6 +4,7 @@ import os
 import aiohttp
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
+from aiogram.types import BotCommand
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -111,6 +112,45 @@ async def create_lead_with_contact(
             return lead_id
 
 
+# ===== AMOCRM NOTE FUNKSiyasi =====
+async def add_telegram_note_to_lead(
+    domain: str,
+    token: str,
+    lead_id: int,
+    chat_id: int,
+    username: str = None,
+    first_name: str = None,
+    last_name: str = None
+) -> None:
+    """
+    Yaratilgan lead ga Telegram metadata'sini note sifatida biriktiradi.
+    Xato bo'lsa faqat log qiladi — registratsiya oqimini buzmaydi.
+    """
+    headers = {"Authorization": f"Bearer {token}"}
+    note_url = f"https://{domain}.amocrm.ru/api/v4/leads/{lead_id}/notes"
+
+    note_text = (
+        f"Telegram Chat ID: {chat_id}\n"
+        f"Telegram Username: @{username if username else 'N/A'}\n"
+        f"Telegram First Name: {first_name if first_name else 'N/A'}\n"
+        f"Telegram Last Name: {last_name if last_name else 'N/A'}"
+    )
+
+    note_data = [{
+        "note_type": "common",
+        "params": {"text": note_text}
+    }]
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(note_url, headers=headers, json=note_data) as resp:
+            if resp.status not in (200, 201):
+                text = await resp.text()
+                logging.error(f"Note yaratishda xato {resp.status}: {text}")
+                raise Exception(f"Note yaratishda xato: {resp.status}")
+
+            logging.info(f"amoCRM note biriktirildi: lead_id={lead_id}")
+
+
 # ===== HOLATLAR =====
 class Royxat(StatesGroup):
     ism = State()
@@ -171,6 +211,20 @@ async def telefon_qabul(message: types.Message, state: FSMContext):
             pipeline_id=AMOCRM_PIPELINE_ID
         )
         logging.info(f"amoCRM lead yaratildi: {lead_id}")
+
+        # --- Telegram metadata'sini lead ga note qilib biriktirish ---
+        try:
+            await add_telegram_note_to_lead(
+                domain=AMOCRM_DOMAIN,
+                token=AMOCRM_ACCESS_TOKEN,
+                lead_id=lead_id,
+                chat_id=message.chat.id,
+                username=message.from_user.username,
+                first_name=message.from_user.first_name,
+                last_name=message.from_user.last_name
+            )
+        except Exception as e:
+            logging.error(f"amoCRM note biriktirishda xato: {e}")
     except Exception as e:
         logging.error(f"amoCRM ga yuborishda xato: {e}")
 
@@ -191,9 +245,18 @@ async def telefon_qabul(message: types.Message, state: FSMContext):
     )
 
 
+# ===== BOT KOMANDALARI =====
+async def set_commands(bot: Bot):
+    commands = [
+        BotCommand(command="start", description="Ro'yxatdan o'tish"),
+    ]
+    await bot.set_my_commands(commands)
+
+
 # ===== MAIN =====
 async def main():
     await bot.delete_webhook(drop_pending_updates=True)
+    await set_commands(bot)
     print("✅ Bot ishga tushdi!")
     await dp.start_polling(bot)
 
