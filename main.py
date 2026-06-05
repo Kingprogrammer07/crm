@@ -122,6 +122,13 @@ async def create_lead_with_contact(
 
             logging.info(f"[LINK] STATUS: {resp.status} lead_id={lead_id} contact_id={contact_id}")
 
+        # 4. DIAGNOSTIKA: lead ichida contact bog'langanini tekshirish
+        verify_url = f"{base_url}/leads/{lead_id}?with=contacts"
+        async with session.get(verify_url, headers=headers) as resp:
+            verify_body = await resp.text()
+            logging.info(f"[VERIFY] STATUS: {resp.status}")
+            logging.info(f"[VERIFY] RESPONSE body: {verify_body}")
+
         return lead_id
 
 
